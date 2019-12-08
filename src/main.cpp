@@ -1,37 +1,21 @@
 #include <Arduino.h>
-#include "SSD1306Wire.h"
 #include <string>
-#include <sstream>
-#include <limits.h>
-#include <JC_Button.h> 
+#include <JC_Button.h>
 
-#define SSTR( x ) static_cast< std::ostringstream & >( \
-        ( std::ostringstream() << std::dec << x ) ).str()
-
-#define runEvery(t) for (static uint16_t _lasttime;\
-                         (uint16_t)((uint16_t)millis() - _lasttime) >= (t);\
-                         _lasttime += (t))
+#include "helpers.h"
+#include "display.h"
+#include "config.h"
 
 
-const byte
-  SWITCH_PIN(35),
-  UP_PIN(33),
-  DOWN_PIN(32);
-
-SSD1306Wire  display(0x3c, SDA, SCL);
-const String color[4] = {"R", "G", "B", "W"};
-int fill[4] = {255, 255, 255, 255};
-const byte led_pins[4] = {15, 27, 2, 16};
+Display display(0x3c, SDA, SCL);
+std::array<int, 4> fill = {255, 255, 255, 255};
 int position = 0;
-float width = display.getWidth();
-float height = display.getHeight();
 bool active = true;
-byte touchpin = 13;
-int touchthd = 6;
+
 Button 
-  SwitchButton(SWITCH_PIN),
-  UpButton(UP_PIN),
-  DownButton(DOWN_PIN);
+  SwitchButton(config::SWITCH_PIN),
+  UpButton(config::UP_PIN),
+  DownButton(config::DOWN_PIN);
 
 void switchSelection(){
   position++;
@@ -49,7 +33,7 @@ void IRAM_ATTR touchToggle(){
     int timestamp = millis();
     for (size_t i = 0; i < 5; i++)
     {
-      if (touchRead(touchpin) > touchthd){ return; }
+      if (touchRead(config::touchpin) > config::touchthd){ return; }
       while (timestamp - millis() < 10);
       timestamp = millis();
     }
@@ -57,63 +41,110 @@ void IRAM_ATTR touchToggle(){
     Serial.println(active);
   }
   last_interrupt_time = interrupt_time;
-  
 }
 
 void setup() {
   Serial.begin(115200);
-  display.init();
-  display.setContrast(255);
+  display.setup();
   SwitchButton.begin();
   UpButton.begin();
   DownButton.begin();
   for (size_t i = 0; i < 4; i++)
   {
     ledcSetup(i, 5000, 8);
-    ledcAttachPin(led_pins[i], i);
+    ledcAttachPin(config::led_pins[i], i);
     ledcWrite(i, 0);
   }
-  touchAttachInterrupt(touchpin, touchToggle, touchthd);
+  //touchAttachInterrupt(touchpin, touchToggle, touchthd);
 
   for (size_t i = 0; i < 4; i++){
       ledcWrite(i, fill[i]);
   }
-  
+
+  //Serial.println("Starting bluetooth service...");
+  //setupBLE();
 }
 
-void drawRect() {
-  float amount = 4;
-  float outerdist = 5;
-  float spacing = 13;
-  float totalspacing = (amount - 1) * spacing;
-  int radius = round((width - 1 - outerdist * 2 - totalspacing) / (2 * amount));
-  for (size_t i = 1; i < amount + 1; i++)
-  {
-    display.setColor(WHITE);
-    float fillheight = 1 / 255.0 * fill[i - 1];
-    float circledist = radius * (1 + 2 * (i - 1));
-    float spacingdist = spacing * (i - 1);
-    float positionX = round(outerdist + spacingdist + circledist);
-    float positionY = round(height / 5);
-    float calcheight = round(height / 5.0 * 3.0);
-    float dist = round(calcheight * fillheight);
-    display.drawRect(positionX - radius, positionY, radius * 2, calcheight);
-    display.fillRect(positionX - radius, positionY + calcheight - dist, radius * 2, dist);
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.drawString(positionX, 0, SSTR(fill[i - 1]).c_str());
-    if (i == position + 1) {
-      display.fillRect(positionX - radius / 2.5, positionY * 4.2, 8, 9);
-      display.setColor(BLACK);
+std::array<int, 3> hsv2rgb(std::array<int, 3> fill)
+{
+    double hh, p, q, t, ff;
+    long i;
+    std::array<int, 3> out;
+
+    double h = fill[0];
+    double s = fill[1];
+    double v = fill[2];
+
+    if(s <= 0.0) {       // < is bogus, just shuts up warnings
+        out[0] = v;
+        out[1] = v;
+        out[2] = v;
+        return out;
     }
-    display.drawString(positionX, positionY * 4, color[i - 1]);
+    hh = h;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = v * (1.0 - s);
+    q = v * (1.0 - (s * ff));
+    t = v * (1.0 - (s * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        out[0] = v;
+        out[1] = t;
+        out[2] = p;
+        break;
+    case 1:
+        out[0] = q;
+        out[1] = v;
+        out[2] = p;
+        break;
+    case 2:
+        out[0] = p;
+        out[1] = v;
+        out[2] = t;
+        break;
+
+    case 3:
+        out[0] = p;
+        out[1] = q;
+        out[2] = v;
+        break;
+    case 4:
+        out[0] = t;
+        out[1] = p;
+        out[2] = v;
+        break;
+    case 5:
+    default:
+        out[0] = v;
+        out[1] = p;
+        out[2] = q;
+        break;
+    }
+    return out;     
+}
+
+void setColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
+  std::array<int, 4> color = fill;
+  if (mode == "hsv") {
+    std::array<int, 3> rgb = hsv2rgb({color[0], color[1], color[2]});
+    color = {rgb[0], rgb[1], rgb[2], color[3]};
+  } 
+  for (size_t i = 0; i < 3; i++){
+    ledcWrite(i, color[i]);
+  }
+  if (autowhite) {
+    ledcWrite(3, *std::min_element(color.begin(), color.end()));
+  } else {
+    ledcWrite(3, color[3]);
   }
 }
 
 void loop() {
-  display.clear();
-
-  drawRect();
-
+  display.drawRGBW(position, fill);
 
   SwitchButton.read();
 
@@ -141,20 +172,13 @@ void loop() {
       fill[position] = 0;
     }
     if (active) {
-      for (size_t i = 0; i < 4; i++){
-        ledcWrite(i, fill[i]);
-      }
+      setColor(fill, "hsv");
     } else {
       for (size_t i = 0; i < 4; i++){
         ledcWrite(i, 0);
       }
     }
 
-    /* Serial.println(touchRead(touchpin));*/
+    //loopBLE();
   }
-  
-
-
-  /* Serial.println(fillradius); */
-  display.display();
 }
