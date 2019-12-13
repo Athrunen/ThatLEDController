@@ -71,9 +71,9 @@ std::array<int, 3> hsv2rgb(std::array<int, 3> fill)
     long i;
     std::array<int, 3> out;
 
-    double h = fill[0];
-    double s = fill[1];
-    double v = fill[2];
+    double h = double(fill[0]) / 255 * 360;
+    double s = double(fill[1]) / 255;
+    double v = double(fill[2]) / 255;
 
     if(s <= 0.0) {       // < is bogus, just shuts up warnings
         out[0] = v;
