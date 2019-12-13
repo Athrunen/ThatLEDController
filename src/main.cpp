@@ -144,7 +144,7 @@ void setColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = fal
 }
 
 void loop() {
-  display.drawRGBW(position, fill);
+  display.drawHSVW(position, fill);
 
   SwitchButton.read();
 
