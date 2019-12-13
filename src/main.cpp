@@ -137,7 +137,7 @@ void setColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = fal
     ledcWrite(i, color[i]);
   }
   if (autowhite) {
-    ledcWrite(3, *std::min_element(color.begin(), color.end()));
+    ledcWrite(3, *std::min_element(color.begin(), color.end() - 1));
   } else {
     ledcWrite(3, color[3]);
   }
