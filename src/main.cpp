@@ -5,12 +5,14 @@
 #include "helpers.h"
 #include "display.h"
 #include "config.h"
+#include "color.h"
 
 
 Display display(0x3c, SDA, SCL);
 std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
 int position = 0;
 bool active = true;
+String mode = "hsv";
 
 Button 
   SwitchButton(config::SWITCH_PIN),
@@ -65,82 +67,45 @@ void setup() {
   //setupBLE();
 }
 
-std::array<int, 3> hsv2rgb(std::array<int, 3> fill)
-{
-    double hh, p, q, t, ff;
-    long i;
-    std::array<int, 3> out;
-
-    double h = double(fill[0]) / 255 * 360;
-    double s = double(fill[1]) / 255;
-    double v = double(fill[2]) / 255;
-
-    if(s <= 0.0) {       // < is bogus, just shuts up warnings
-        out[0] = v;
-        out[1] = v;
-        out[2] = v;
-        return out;
+std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
+  if (mode == "manual") {
+    for (size_t i = 0; i < 4; i++){
+      ledcWrite(i, fill[i]);
     }
-    hh = h;
-    if(hh >= 360.0) hh = 0.0;
-    hh /= 60.0;
-    i = (long)hh;
-    ff = hh - i;
-    p = v * (1.0 - s);
-    q = v * (1.0 - (s * ff));
-    t = v * (1.0 - (s * (1.0 - ff)));
+    return;
+  }
 
-    switch(i) {
-    case 0:
-        out[0] = v;
-        out[1] = t;
-        out[2] = p;
-        break;
-    case 1:
-        out[0] = q;
-        out[1] = v;
-        out[2] = p;
-        break;
-    case 2:
-        out[0] = p;
-        out[1] = v;
-        out[2] = t;
-        break;
+  // Be smart and convert only twice, here..
+  std::array<double, 4> color;
+  for (size_t i = 0; i < color.size; i++){
+    color[i] = fill[i] / (double)config::resolution_factor;
+  }
 
-    case 3:
-        out[0] = p;
-        out[1] = q;
-        out[2] = v;
-        break;
-    case 4:
-        out[0] = t;
-        out[1] = p;
-        out[2] = v;
-        break;
-    case 5:
-    default:
-        out[0] = v;
-        out[1] = p;
-        out[2] = q;
-        break;
-    }
-    return out;     
-}
-
-void setColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
-  std::array<int, 4> color = fill;
   if (mode == "hsv") {
-    std::array<int, 3> rgb = hsv2rgb({color[0], color[1], color[2]});
+    std::array<double, 3> rgb = color::hsv2rgb({color[0] * 360., color[1], color[2]});
     color = {rgb[0], rgb[1], rgb[2], color[3]};
-  } 
-  for (size_t i = 0; i < 3; i++){
-    ledcWrite(i, color[i]);
   }
+
+  if (mode == "hsi") {
+    std::array<double, 3> rgb = color::hsi2rgb({color[0] * 360., color[1], color[2]});
+    color = {rgb[0], rgb[1], rgb[2], color[3]};
+  }
+
   if (autowhite) {
-    ledcWrite(3, *std::min_element(color.begin(), color.end() - 1));
-  } else {
-    ledcWrite(3, color[3]);
+    double index = std::min_element(color.begin(), color.end() - 1) - color.begin();
+    double factor = color[3];
+    double min_color = color[index];
+    color[index] = min_color * (1 - factor);
+    color[3] = min_color * factor;
+  } 
+
+  // .. and here
+  std::array<int, 4> out;
+  for (size_t i = 0; i < color.size; i++){
+    out[i] = color[i] * config::resolution_factor;
   }
+
+  return out;
 }
 
 void loop() {
@@ -171,8 +136,13 @@ void loop() {
     } else if (fill[position] < 0) {
       fill[position] = 0;
     }
+
+    
     if (active) {
-      setColor(fill, "hsv");
+      std::array<int, 4> color = calculateColor(fill, "hsv", true);
+      for (size_t i = 0; i < 4; i++){
+        ledcWrite(i, color[i]);
+      }
     } else {
       for (size_t i = 0; i < 4; i++){
         ledcWrite(i, 0);
