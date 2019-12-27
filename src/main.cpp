@@ -12,6 +12,7 @@ Display display(0x3c, SDA, SCL);
 std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
 int position = 0;
 bool active = true;
+bool longpress = false;
 String mode = "hsv";
 
 Button 
@@ -113,8 +114,15 @@ void loop() {
 
   SwitchButton.read();
 
-  if (SwitchButton.wasReleased()) {
-    switchSelection();
+  if (SwitchButton.releasedFor(1000) and not longpress){
+    longpress = true;
+    Serial.println("LongPress!");
+  } else if (SwitchButton.wasPressed()) {
+    if (longpress) {
+      longpress = false;
+    } else {
+      switchSelection();
+    }
   }
 
 
