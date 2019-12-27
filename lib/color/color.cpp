@@ -1,4 +1,4 @@
-#include "color.h"
+#include <color.h>
 
 std::array<double, 3> color::hsv2rgb(std::array<double, 3> color)
 {
@@ -151,7 +151,7 @@ std::array<double, 3> color::rgb2hsi(std::array<double, 3> color) {
 
     double h, s, i;
 
-    double s = r + g + b;
+    s = r + g + b;
 
     i = s / 3.;
 
