@@ -13,6 +13,9 @@ namespace config
     const byte led_pins[4] = {15, 27, 2, 16};
     const byte touchpin = 13;
     const int touchthd = 6;
+    const int screen_steps = 255;
+    const int resolution = 16;
+    const int resolution_factor = pow(resolution, 2) - 1;
 }
 
 #endif
