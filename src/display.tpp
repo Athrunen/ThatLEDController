@@ -1,3 +1,5 @@
+#include "config.h"
+
 template<std::size_t SIZE>
 void Display::drawColorInput(int selector_position, std::array<int, SIZE> fill, std::array<String, SIZE> names, float spacing) {
     int amount = fill.size();

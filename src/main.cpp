@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <string>
 #include <JC_Button.h>
+#include <color.h>
 
 #include "helpers.h"
 #include "display.h"
 #include "config.h"
-#include "color.h"
 
 
 Display display(0x3c, SDA, SCL);
@@ -70,15 +70,12 @@ void setup() {
 
 std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
   if (mode == "manual") {
-    for (size_t i = 0; i < 4; i++){
-      ledcWrite(i, fill[i]);
-    }
-    return;
+    return fill;
   }
 
   // Be smart and convert only twice, here..
   std::array<double, 4> color;
-  for (size_t i = 0; i < color.size; i++){
+  for (size_t i = 0; i < 4; i++){
     color[i] = fill[i] / (double)config::resolution_factor;
   }
 
@@ -102,7 +99,7 @@ std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", 
 
   // .. and here
   std::array<int, 4> out;
-  for (size_t i = 0; i < color.size; i++){
+  for (size_t i = 0; i < 4; i++){
     out[i] = color[i] * config::resolution_factor;
   }
 
