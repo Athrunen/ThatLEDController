@@ -8,7 +8,7 @@
 
 
 Display display(0x3c, SDA, SCL);
-std::array<int, 4> fill = {255, 255, 255, 255};
+std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
 int position = 0;
 bool active = true;
 
@@ -51,7 +51,7 @@ void setup() {
   DownButton.begin();
   for (size_t i = 0; i < 4; i++)
   {
-    ledcSetup(i, 5000, 8);
+    ledcSetup(i, 5000, config::resolution);
     ledcAttachPin(config::led_pins[i], i);
     ledcWrite(i, 0);
   }
@@ -166,8 +166,8 @@ void loop() {
     } else if (DownButton.releasedFor(500)){
       fill[position]--;
     }
-    if (fill[position] > 255) {
-      fill[position] = 255;
+    if (fill[position] > config::resolution_factor) {
+      fill[position] = config::resolution_factor;
     } else if (fill[position] < 0) {
       fill[position] = 0;
     }

@@ -6,7 +6,7 @@ void Display::drawColorInput(int selector_position, std::array<int, SIZE> fill, 
     for (size_t i = 1; i < amount + 1; i++)
     {
         dp->setColor(WHITE);
-        float fillheight = 1 / 255.0 * fill[i - 1];
+        float fillheight = fill[i - 1] / float(config::resolution_factor);
         float circledist = radius * (1 + 2 * (i - 1));
         float spacingdist = spacing * (i - 1);
         float positionX = round(outerdist + spacingdist + circledist);
