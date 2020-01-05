@@ -115,6 +115,7 @@ std::array<double, 3> color::rgb2hsv(std::array<double, 3> color)
 std::array<double, 3> color::hsi2rgb(std::array<double, 3> color)
 {
     double h = fmod(color[0], 360);
+    h = M_PI * h / (float)180;
     double s = color[1] > 0 ? (color[1] < 1 ? color[1] : 1) : 0;
     double i = color[2] > 0 ? (color[2] < 1 ? color[2] : 1) : 0;
 
@@ -122,23 +123,25 @@ std::array<double, 3> color::hsi2rgb(std::array<double, 3> color)
 
     if(s == 0) 
         return {i, i, i};
+
+    double i_3 = i / 3;
     
-    double x = i / 3 * (1 - s);
-    double y = i / 3 * (1 + s * cos(h) / cos(M_PI_3 - h));
-    double z = i / 3 * (1 + s * (1 - cos(h) / cos(M_PI_3 - h)));
+    double x = i_3 * (1 - s);
 
     if (h < 2 * M_PI_3) {
-        r = y;
-        g = z;
+        r = i_3 * (1 + s * cos(h) / cos(M_PI_3 - h));
         b = x;
+        g = 1 - (r + b);
     } else if (h < 4 * M_PI_3) {
+        h = h - 2 * M_PI_3;
         r = x;
-        g = y;
-        b = z;
+        g = i_3 * (1 + s * cos(h) / cos(M_PI_3 - h));
+        b = 1 - (r + g);
     } else {
-        r = z;
+        h = h - 4 * M_PI_3;
         g = x;
-        b = y;
+        b = i_3 * (1 + s * cos(h) / cos(M_PI_3 - h));
+        r = 1 - (g + b);
     }
 
     return {r, g, b};
@@ -151,22 +154,19 @@ std::array<double, 3> color::rgb2hsi(std::array<double, 3> color) {
 
     double h, s, i;
 
-    s = r + g + b;
+    i = (r + g + b) / 3.;
 
-    i = s / 3.;
+    s = 1 - (3 / (r + g + b)) * std::min(r, std::min(g, b));
 
-    double rn = r / s;
-    double gn = g / s;
-    double bn = b / s;
-
-    s = 1 - 3 * std::min(rn, std::min(gn, bn));
-    
-    h = acos((0.5 * ((rn - gn) + (rn - bn))) / (sqrt((rn - gn) * (rn - gn) + (rn - bn) * (gn - bn))));
+    double numi = (0.5 * ((r - g) + (r - b)));
+    double denom = sqrt(pow((r - g), 2) + (r - b) * (g - b));
+    h = acos(numi / denom);
+    h = M_PI * h / (float)180;
 
     if(b > g)
 	{
 		h = TWOPI - h;
 	}
 
-    return {h, s, i};
+    return {h / M_PI * 180., s, i};
 }
