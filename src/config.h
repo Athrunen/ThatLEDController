@@ -15,7 +15,7 @@ namespace config
     const int touchthd = 6;
     const int screen_steps = 255;
     const int resolution = 16;
-    const int resolution_factor = pow(resolution, 2) - 1;
+    const int resolution_factor = pow(2, resolution) - 1;
 }
 
 #endif
