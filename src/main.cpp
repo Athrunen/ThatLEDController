@@ -27,25 +27,6 @@ void switchSelection(){
   }
 }
 
-void IRAM_ATTR touchToggle(){
-  static unsigned long last_interrupt_time = 0;
-  unsigned long interrupt_time = millis();
-  // If interrupts come faster than 200ms, assume it's a bounce and ignore
-  if (interrupt_time - last_interrupt_time > 200) 
-  {
-    int timestamp = millis();
-    for (size_t i = 0; i < 5; i++)
-    {
-      if (touchRead(config::touchpin) > config::touchthd){ return; }
-      while (timestamp - millis() < 10);
-      timestamp = millis();
-    }
-    active = !active;
-    Serial.println(active);
-  }
-  last_interrupt_time = interrupt_time;
-}
-
 void setup() {
   Serial.begin(115200);
   display.setup();
