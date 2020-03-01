@@ -16,11 +16,15 @@ AsyncUDP udp;
 WiFiManager wifiManager;
 
 Display display(0x3c, SDA, SCL);
+std::array<int, 4> oldfill = {0, 0, 0, 0};
 std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
+std::array<int, 4> currentcolor = {0, 0, 0, 0};
 int position = 0;
 bool active = true;
 bool longpress = false;
-String mode = "hsv";
+std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsl"};
+std::string oldmode = "hsv";
+std::string mode = "hsv";
 
 Button 
   SwitchButton(config::SWITCH_PIN),
@@ -60,10 +64,9 @@ void setup() {
   wifiManager.autoConnect("ThatLEDController");
 }
 
-std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
-  if (mode == "manual") {
+std::array<int, 4> calculateColor(std::array<int, 4> fill, std::string mode = "rgb", bool autowhite = false) {
+  if (mode == "manual")
     return fill;
-  }
 
   // Be smart and convert only twice, here..
   std::array<double, 4> color;
@@ -98,6 +101,17 @@ std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", 
   return out;
 }
 
+void setColor(std::array<int, 4> color) {
+  if (active) {
+    for (size_t i = 0; i < 4; i++){
+      ledcWrite(i, color[i]);
+    }
+  } else {
+    for (size_t i = 0; i < 4; i++){
+      ledcWrite(i, 0);
+    }
+  }
+}
 void loop() {
   display.drawHSVW(position, fill);
 
@@ -133,18 +147,6 @@ void loop() {
     } else if (fill[position] < 0) {
       fill[position] = 0;
     }
-
-    
-    if (active) {
-      std::array<int, 4> color = calculateColor(fill, "hsv", true);
-      for (size_t i = 0; i < 4; i++){
-        ledcWrite(i, color[i]);
-      }
-    } else {
-      for (size_t i = 0; i < 4; i++){
-        ledcWrite(i, 0);
-      }
-    }
   }
 
   runEvery(2000) {
@@ -158,4 +160,10 @@ void loop() {
     }
   }
   wifiManager.process();
+  if (fill != oldfill || mode != oldmode) {
+    currentcolor = calculateColor(fill, mode, true);
+    setColor(currentcolor);
+    oldfill = fill;
+    oldmode = mode;
+  }
 }
