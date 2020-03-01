@@ -14,6 +14,7 @@ namespace config
     const int screen_steps = 255;
     const int resolution = 16;
     const int resolution_factor = pow(2, resolution) - 1;
+    const bool debug = true;
 }
 
 #endif
