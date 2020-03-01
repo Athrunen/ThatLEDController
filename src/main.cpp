@@ -191,24 +191,30 @@ void loop() {
     }
   }
 
-
   runEvery(10) {
     UpButton.read();
     DownButton.read();
+    int ps = 0;
     if (UpButton.wasReleased()) {
-      fill[position]++;
+      ps = 1;
     } else if (UpButton.releasedFor(500)) {
-      fill[position]++;
+      ps = 50;
+    } else if (UpButton.releasedFor(1000)) {
+      ps = 100;
     }
     if (DownButton.wasReleased()) { 
-      fill[position]--;
+      ps = -1;
     } else if (DownButton.releasedFor(500)){
-      fill[position]--;
+      ps = -50;
+    } else if (DownButton.releasedFor(1000)) {
+      ps = -100;
     }
-    if (fill[position] > config::resolution_factor) {
+    if (fill[position] + ps > config::resolution_factor) {
       fill[position] = config::resolution_factor;
-    } else if (fill[position] < 0) {
+    } else if (fill[position] + ps < 0) {
       fill[position] = 0;
+    } else {
+      fill[position] += ps;
     }
   }
 
