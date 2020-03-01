@@ -24,7 +24,7 @@ std::array<int, 4> currentcolor = {0, 0, 0, 0};
 int position = 0;
 bool active = true;
 bool longpress = false;
-std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsl"};
+std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsi"};
 std::string oldmode = "hsv";
 std::string mode = "hsv";
 
