@@ -1,12 +1,19 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <AsyncUDP.h>
+#include <WebServer.h>
 #include <string>
 #include <JC_Button.h>
+#include <WiFiManager.h>
+
 #include <color.h>
 
 #include "helpers.h"
 #include "display.h"
 #include "config.h"
 
+AsyncUDP udp;
+WiFiManager wifiManager;
 
 Display display(0x3c, SDA, SCL);
 std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
@@ -28,6 +35,7 @@ void switchSelection(){
 }
 
 void setup() {
+  WiFi.mode(WIFI_STA);
   Serial.begin(115200);
   display.setup();
   SwitchButton.begin();
@@ -47,6 +55,9 @@ void setup() {
 
   //Serial.println("Starting bluetooth service...");
   //setupBLE();
+  wifiManager.setClass("invert");
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.autoConnect("ThatLEDController");
 }
 
 std::array<int, 4> calculateColor(std::array<int, 4> fill, String mode = "rgb", bool autowhite = false) {
@@ -134,7 +145,17 @@ void loop() {
         ledcWrite(i, 0);
       }
     }
-
-    //loopBLE();
   }
+
+  runEvery(2000) {
+    if (WiFi.status() == WL_CONNECTED) {
+      IPAddress broadcastip;
+      broadcastip = ~WiFi.subnetMask() | WiFi.gatewayIP();
+      if(udp.connect(broadcastip, 24444)) {
+        udp.print("ThatLEDController online!");
+      }
+      udp.close();
+    }
+  }
+  wifiManager.process();
 }
