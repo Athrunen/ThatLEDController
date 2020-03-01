@@ -14,6 +14,8 @@
 
 AsyncUDP udp;
 WiFiManager wifiManager;
+WiFiServer wifiServer(25555);
+WiFiClient wifiClient;
 
 Display display(0x3c, SDA, SCL);
 std::array<int, 4> oldfill = {0, 0, 0, 0};
@@ -36,6 +38,52 @@ void switchSelection(){
   if (position == 4) {
     position = 0;
   }
+}
+
+std::vector<std::string> split (const std::string& str, char delimiter) {
+  std::vector<std::string> tokens;
+  std::string token;
+  std::istringstream tokenStream(str);
+  while(std::getline(tokenStream, token, delimiter)) {
+    tokens.push_back(token);
+  }
+  return tokens;
+}
+
+void setCmd(std::string str) {
+  std::ostringstream os;
+  if (config::debug) {
+    os << "Serial command received: " << str << "\n";
+  }
+  std::vector<std::string> tokens = split(str, ' '); 
+  if (tokens.size() < 1) {
+    return;
+  }
+  std::string tmode = tokens[1];
+  int tsize = tokens.size() - 2;
+  std::array<int, 4> color;
+  for (size_t i = 0; i < 4; i++) {
+    color[i] = i < tsize ? atof(tokens[i + 2].c_str()) * config::resolution_factor : fill[i];
+    color[i] = color[i] >= 0 ? color[i] : fill[i]; 
+  }
+  if (std::find(std::begin(modes), std::end(modes), tmode) != std::end(modes)) {
+    mode = tmode;
+  }
+  if (config::debug) {
+    os << "Parsed, setting values to: [";
+    for (size_t i = 0; i < 4; i++){
+      os << color[i];
+      if (i != 3) {
+        os << ", ";
+      }
+    }
+    os << "]\n";
+    os << "Mode: " << tmode;
+  } else {
+    os << "Command received";
+  }
+  Serial.println(os.str().c_str());
+  fill = color;
 }
 
 void setup() {
@@ -62,11 +110,13 @@ void setup() {
   wifiManager.setClass("invert");
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.autoConnect("ThatLEDController");
+  wifiServer.begin();
 }
 
 std::array<int, 4> calculateColor(std::array<int, 4> fill, std::string mode = "rgb", bool autowhite = false) {
   if (mode == "manual")
     return fill;
+
 
   // Be smart and convert only twice, here..
   std::array<double, 4> color;
@@ -112,6 +162,19 @@ void setColor(std::array<int, 4> color) {
     }
   }
 }
+
+void CheckForConnection() {
+  if (wifiServer.hasClient()) {
+    if (wifiClient.connected()) {
+      wifiServer.available().stop();
+    } else {
+      wifiClient = wifiServer.available();
+      Serial.println("Client connected!");
+      wifiClient.write("Hey there!");
+    }
+  }
+}
+
 void loop() {
   display.drawHSVW(position, fill);
 
@@ -160,6 +223,13 @@ void loop() {
     }
   }
   wifiManager.process();
+  CheckForConnection();
+  if (wifiClient.available()) {
+    std::string cm(wifiClient.readStringUntil('\n').c_str());
+    if (cm.rfind("set ", 0) == 0) {
+        setCmd(cm);
+    }
+  }
   if (fill != oldfill || mode != oldmode) {
     currentcolor = calculateColor(fill, mode, true);
     setColor(currentcolor);
