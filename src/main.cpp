@@ -3,42 +3,44 @@
 #include <AsyncUDP.h>
 #include <WebServer.h>
 #include <string>
-#include <JC_Button.h>
 #include <WiFiManager.h>
 
 #include <color.h>
-
 #include "helpers.h"
-#include "display.h"
 #include "config.h"
+
+#ifdef FULLMODE
+
+#include <JC_Button.h>
+#include "display.h"
+
+#endif
 
 AsyncUDP udp;
 WiFiManager wifiManager;
 WiFiServer wifiServer(25555);
 WiFiClient wifiClient;
 
+#ifdef FULLMODE
+
 Display display(0x3c, SDA, SCL);
-std::array<int, 4> oldfill = {0, 0, 0, 0};
-std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
-std::array<int, 4> currentcolor = {0, 0, 0, 0};
-int position = 0;
-bool active = true;
 bool longpress = false;
-std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsi"};
-std::string oldmode = "hsv";
-std::string mode = "hsv";
+int position = 0;
 
 Button 
   SwitchButton(config::SWITCH_PIN),
   UpButton(config::UP_PIN),
   DownButton(config::DOWN_PIN);
 
-void switchSelection(){
-  position++;
-  if (position == 4) {
-    position = 0;
-  }
-}
+#endif
+
+std::array<int, 4> oldfill = {0, 0, 0, 0};
+std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
+std::array<int, 4> currentcolor = {0, 0, 0, 0};
+std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsi"};
+std::string oldmode = "hsv";
+std::string mode = "hsv";
+bool active = true;
 
 std::vector<std::string> split (const std::string& str, char delimiter) {
   std::vector<std::string> tokens;
@@ -87,26 +89,29 @@ void setCmd(std::string str) {
 }
 
 void setup() {
-  WiFi.mode(WIFI_STA);
   Serial.begin(115200);
+
+  #ifdef FULLMODE
+
   display.setup();
   SwitchButton.begin();
   UpButton.begin();
   DownButton.begin();
+
+  #endif
+
+  WiFi.mode(WIFI_STA);
   for (size_t i = 0; i < 4; i++)
   {
     ledcSetup(i, 5000, config::resolution);
     ledcAttachPin(config::led_pins[i], i);
     ledcWrite(i, 0);
   }
-  //touchAttachInterrupt(touchpin, touchToggle, touchthd);
 
   for (size_t i = 0; i < 4; i++){
       ledcWrite(i, fill[i]);
   }
 
-  //Serial.println("Starting bluetooth service...");
-  //setupBLE();
   wifiManager.setClass("invert");
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.autoConnect("ThatLEDController");
@@ -175,7 +180,21 @@ void CheckForConnection() {
   }
 }
 
+#ifdef FULLMODE
+
+void switchSelection(){
+  position++;
+  if (position == 4) {
+    position = 0;
+  }
+}
+
+#endif
+
+
 void loop() {
+  #ifdef FULLMODE
+
   display.drawHSVW(position, fill);
 
   SwitchButton.read();
@@ -217,6 +236,8 @@ void loop() {
       fill[position] += ps;
     }
   }
+
+  #endif
 
   runEvery(2000) {
     if (WiFi.status() == WL_CONNECTED) {

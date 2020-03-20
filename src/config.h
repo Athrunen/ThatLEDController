@@ -6,6 +6,9 @@
 
 namespace config
 {
+    
+    #define FULLMODE
+
     const byte
         SWITCH_PIN(35),
         UP_PIN(33),
