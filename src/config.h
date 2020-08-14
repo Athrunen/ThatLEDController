@@ -7,7 +7,7 @@
 namespace config
 {
     
-    #define FULLMODE
+    //#define FULLMODE
 
     #ifdef FULLMODE
 
