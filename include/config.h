@@ -1,12 +1,12 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <Arduino.h>
 #include <array>
+#include <Arduino.h>
 
 namespace config
 {
-    
+
     //#define FULLMODE
 
     #ifdef FULLMODE
@@ -19,10 +19,11 @@ namespace config
     
     #endif
 
-    const byte led_pins[4] = {15, 27, 2, 16};
+    const byte led_pins[4] = {16, 17, 18, 19}; // {15, 27, 2, 16}
     const int resolution = 16;
     const int resolution_factor = pow(2, resolution) - 1;
     const bool debug = true;
+    const std::array<std::string, 4> modes = {"manual", "hsv", "hsi"};
 }
 
 #endif
