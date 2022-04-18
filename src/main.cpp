@@ -1,13 +1,13 @@
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <WiFi.h>
 #include <AsyncUDP.h>
 #include <WebServer.h>
-#include <string>
 #include <WiFiManager.h>
 
-#include <color.h>
-#include "helpers.h"
 #include "config.h"
+#include "color.h"
+#include "commands.h"
 
 #ifdef FULLMODE
 
@@ -17,6 +17,7 @@
 #endif
 
 AsyncUDP udp;
+WebServer webServer(80);
 WiFiManager wifiManager;
 WiFiServer wifiServer(25555);
 WiFiClient wifiClient;
@@ -34,58 +35,25 @@ Button
 
 #endif
 
-std::array<int, 4> oldfill = {0, 0, 0, 0};
-std::array<int, 4> fill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
-std::array<int, 4> currentcolor = {0, 0, 0, 0};
-std::array<std::string, 4> modes = {"manual", "rgb", "hsv", "hsi"};
-std::string oldmode = "hsv";
-std::string mode = "hsv";
-bool active = true;
+std::array<int, 4> dimstartfill = {0, 0, 0, 0};
+std::array<int, 4> dimendfill = {0, 0, 0, 0};
+std::array<int, 4> fill = {0, 0, 0, 0};
+std::array<int, 4> nextfill = {config::resolution_factor, config::resolution_factor, config::resolution_factor, config::resolution_factor};
+std::string mode = "manual";
+std::string newmode = "manual";
+bool dimming = false;
 
-std::vector<std::string> split (const std::string& str, char delimiter) {
-  std::vector<std::string> tokens;
-  std::string token;
-  std::istringstream tokenStream(str);
-  while(std::getline(tokenStream, token, delimiter)) {
-    tokens.push_back(token);
-  }
-  return tokens;
-}
+std::array<double, 3> sourcecolor = {0, 0, 0};
+std::array<double, 3> targetcolor = {0, 0, 0};
+int64_t starttime = 0;
+int64_t endtime = 0;
 
-void setCmd(std::string str) {
-  std::ostringstream os;
-  if (config::debug) {
-    os << "Serial command received: " << str << "\n";
-  }
-  std::vector<std::string> tokens = split(str, ' '); 
-  if (tokens.size() < 1) {
-    return;
-  }
-  std::string tmode = tokens[1];
-  int tsize = tokens.size() - 2;
-  std::array<int, 4> color;
-  for (size_t i = 0; i < 4; i++) {
-    color[i] = i < tsize ? atof(tokens[i + 2].c_str()) * config::resolution_factor : fill[i];
-    color[i] = color[i] >= 0 ? color[i] : fill[i]; 
-  }
-  if (std::find(std::begin(modes), std::end(modes), tmode) != std::end(modes)) {
-    mode = tmode;
-  }
-  if (config::debug) {
-    os << "Parsed, setting values to: [";
-    for (size_t i = 0; i < 4; i++){
-      os << color[i];
-      if (i != 3) {
-        os << ", ";
-      }
+void setColor(std::array<int, 4> color)
+{
+    for (size_t i = 0; i < 4; i++)
+    {
+        ledcWrite(i, color[i]);
     }
-    os << "]\n";
-    os << "Mode: " << tmode;
-  } else {
-    os << "Command received";
-  }
-  Serial.println(os.str().c_str());
-  fill = color;
 }
 
 void setup() {
@@ -108,75 +76,50 @@ void setup() {
     ledcWrite(i, 0);
   }
 
-  for (size_t i = 0; i < 4; i++){
-      ledcWrite(i, fill[i]);
-  }
+  setColor(nextfill);
 
   wifiManager.setClass("invert");
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.autoConnect("ThatLEDController");
   wifiServer.begin();
-}
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
 
-std::array<int, 4> calculateColor(std::array<int, 4> fill, std::string mode = "rgb", bool autowhite = false) {
-  if (mode == "manual")
-    return fill;
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
 
-
-  // Be smart and convert only twice, here..
-  std::array<double, 4> color;
-  for (size_t i = 0; i < 4; i++){
-    color[i] = fill[i] / (double)config::resolution_factor;
-  }
-
-  if (mode == "hsv") {
-    std::array<double, 3> rgb = color::hsv2rgb({color[0] * 360., color[1], color[2]});
-    color = {rgb[0], rgb[1], rgb[2], color[3]};
-  }
-
-  if (mode == "hsi") {
-    std::array<double, 3> rgb = color::hsi2rgb({color[0] * 360., color[1], color[2]});
-    color = {rgb[0], rgb[1], rgb[2], color[3]};
-  }
-
-  if (autowhite) {
-    double index = std::min_element(color.begin(), color.end() - 1) - color.begin();
-    double factor = color[3];
-    double min_color = color[index];
-    color[index] = min_color * (1 - factor);
-    color[3] = min_color * factor;
-  } 
-
-  // .. and here
-  std::array<int, 4> out;
-  for (size_t i = 0; i < 4; i++){
-    out[i] = color[i] * config::resolution_factor;
-  }
-
-  return out;
-}
-
-void setColor(std::array<int, 4> color) {
-  if (active) {
-    for (size_t i = 0; i < 4; i++){
-      ledcWrite(i, color[i]);
-    }
-  } else {
-    for (size_t i = 0; i < 4; i++){
-      ledcWrite(i, 0);
-    }
-  }
+  ArduinoOTA.begin();
 }
 
 void CheckForConnection() {
   if (wifiServer.hasClient()) {
-    if (wifiClient.connected()) {
-      wifiServer.available().stop();
-    } else {
-      wifiClient = wifiServer.available();
-      Serial.println("Client connected!");
-      wifiClient.write("Hey there!");
-    }
+    //if (wifiClient.connected()) {
+    //  wifiServer.available().stop();
+    //} else {
+    wifiClient = wifiServer.available();
+    Serial.println("Client connected!");
+    wifiClient.write("Hey there!");
+    //}
   }
 }
 
@@ -195,7 +138,7 @@ void switchSelection(){
 void loop() {
   #ifdef FULLMODE
 
-  display.drawHSVW(position, fill);
+  display.drawHSVW(position, nextfill);
 
   SwitchButton.read();
 
@@ -228,18 +171,18 @@ void loop() {
     } else if (DownButton.releasedFor(1000)) {
       ps = -100;
     }
-    if (fill[position] + ps > config::resolution_factor) {
-      fill[position] = config::resolution_factor;
-    } else if (fill[position] + ps < 0) {
-      fill[position] = 0;
+    if (nextfill[position] + ps > config::resolution_factor) {
+      nextfill[position] = config::resolution_factor;
+    } else if (nextfill[position] + ps < 0) {
+      nextfill[position] = 0;
     } else {
-      fill[position] += ps;
+      nextfill[position] += ps;
     }
   }
 
   #endif
 
-  runEvery(2000) {
+  runEvery(1000) {
     if (WiFi.status() == WL_CONNECTED) {
       IPAddress broadcastip;
       broadcastip = ~WiFi.subnetMask() | WiFi.gatewayIP();
@@ -250,17 +193,34 @@ void loop() {
     }
   }
   wifiManager.process();
+  ArduinoOTA.handle();
   CheckForConnection();
   if (wifiClient.available()) {
     std::string cm(wifiClient.readStringUntil('\n').c_str());
     if (cm.rfind("set ", 0) == 0) {
-        setCmd(cm);
+      commands::setCmd(cm, newmode, nextfill, dimming);
+    } else if (cm.rfind("dim ", 0) == 0){
+      commands::dimCmd(cm, newmode, nextfill, dimming, fill, dimstartfill, dimendfill, starttime, endtime);
     }
   }
-  if (fill != oldfill || mode != oldmode) {
-    currentcolor = calculateColor(fill, mode, true);
+  if (dimming) {
+    int64_t now = esp_timer_get_time();
+    if (now < endtime) {
+      double since = (double)now - (double)starttime;
+      double duration = (double)endtime - (double)starttime;
+      double t = since / duration;
+      nextfill = color::lerp_color(dimstartfill, dimendfill, mode, newmode, t);
+      std::array<int, 4> currentcolor = color::calculateColor(nextfill, newmode, false);
+      setColor(currentcolor);
+    } else {
+      dimming = false;
+      fill = nextfill;
+      mode = newmode;
+    }
+  } else if (nextfill != fill || newmode != mode) {
+    std::array<int, 4> currentcolor = color::calculateColor(nextfill, newmode, false);
     setColor(currentcolor);
-    oldfill = fill;
-    oldmode = mode;
+    fill = nextfill;
+    mode = newmode;
   }
 }
