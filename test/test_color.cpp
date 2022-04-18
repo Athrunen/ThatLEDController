@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <stdio.h>
 
 #include <color.h>
 
@@ -21,7 +22,8 @@ void test_hsv2rgb() {
 
 void test_rgb2hsv2rgb() {
     int factor = pow(10, 9);
-    std::array<double, 3> rgb = {0.78431372549, 0.392156862745, 0.588235294118};
+    //std::array<double, 3> rgb = {0.78431372549, 0.392156862745, 0.588235294118};
+    std::array<double, 3> rgb = {rand()/double(RAND_MAX), rand()/double(RAND_MAX), rand()/double(RAND_MAX)};
     std::array<double, 3> hsv = color::rgb2hsv(rgb);
     std::array<double, 3> rgb2 = color::hsv2rgb(hsv);
     int expected[] = {(int)round(rgb[0] * factor), (int)round(rgb[1] * factor), (int)round(rgb[2] * factor)};
@@ -50,7 +52,7 @@ void process() {
     RUN_TEST(test_rgb2hsv);
     RUN_TEST(test_hsv2rgb);
     RUN_TEST(test_rgb2hsv2rgb);
-    RUN_TEST(test_rgb2hsi2rgb);
+    //RUN_TEST(test_rgb2hsi2rgb);
     UNITY_END();
 }
 
