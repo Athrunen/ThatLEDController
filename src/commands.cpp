@@ -3,6 +3,20 @@
 namespace commands
 {
 
+    WebServer webServer(80);
+
+    void setupRouting() {
+        // TODO: Init webserver, route requests and deconstruct json for each function
+        webServer.on("/configuration", getConfiguration);
+        webServer.on("/", getBase);
+
+        webServer.begin();
+    }
+
+    void handleCommands() {
+        webServer.handleClient();
+    }
+
     class BadCommand : public std::exception
     {
         virtual const char *what() const throw()
@@ -117,6 +131,37 @@ namespace commands
         starttime = esp_timer_get_time();
         endtime = starttime + duration * 1000;
         dimming = true;
+    }
+
+    void getConfiguration() {
+        StaticJsonDocument<250> jsonDocument;
+        char buffer[250];
+        
+        jsonDocument["debug"] = config::debug;
+        
+        const std::array<std::string, 4> names = {"r", "g", "b", "w"};
+        JsonObject pins = jsonDocument.createNestedObject("pins");
+        for (size_t i = 0; i < 4; i++)
+        {
+            pins[names[i]] = config::led_pins[i];
+        }
+        
+        JsonArray modes = jsonDocument.createNestedArray("modes");
+        for (const auto &mode : config::modes)
+        {
+            modes.add(mode);
+        }
+        
+        jsonDocument["resolution_factor"] = config::resolution_factor;
+        
+        serializeJson(jsonDocument, buffer);
+        webServer.send(200, "application/json", buffer);
+    }
+
+    void getBase() {
+    
+        webServer.send(200, "application/json", "{\"ThatLEDController\"}");
+
     }
 
 }

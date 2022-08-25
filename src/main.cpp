@@ -2,7 +2,6 @@
 #include <ArduinoOTA.h>
 #include <WiFi.h>
 #include <AsyncUDP.h>
-#include <WebServer.h>
 #include <WiFiManager.h>
 
 #include "config.h"
@@ -17,7 +16,6 @@
 #endif
 
 AsyncUDP udp;
-WebServer webServer(80);
 WiFiManager wifiManager;
 WiFiServer wifiServer(25555);
 WiFiClient wifiClient;
@@ -79,8 +77,10 @@ void setup() {
   setColor(nextfill);
 
   wifiManager.setClass("invert");
+  wifiManager.setHttpPort(8080);
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.autoConnect("ThatLEDController");
+  
   wifiServer.begin();
   ArduinoOTA
     .onStart([]() {
@@ -109,6 +109,9 @@ void setup() {
     });
 
   ArduinoOTA.begin();
+
+  commands::setupRouting();
+
 }
 
 void CheckForConnection() {
@@ -194,6 +197,7 @@ void loop() {
   }
   wifiManager.process();
   ArduinoOTA.handle();
+  commands::handleCommands();
   CheckForConnection();
   if (wifiClient.available()) {
     std::string cm(wifiClient.readStringUntil('\n').c_str());
